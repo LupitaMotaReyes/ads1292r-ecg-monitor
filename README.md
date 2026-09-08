@@ -12,13 +12,10 @@
 - Acquisition rate (e.g. 500 SPS) fully decoupled from the GUI redraw rate.
 - Heart rate (BPM) from an adaptive R-peak detector with a refractory period and
   RR-interval plausibility rejection — never a fabricated number.
-- Optional respiration waveform and breathing-rate estimate, or an explicit
-  "unavailable" state when there is no respiration channel.
 - Heuristic (non-clinical) signal-quality indicator: GOOD / FAIR / POOR.
 - Raw ADC counts, µV or mV display, with a documented ADC-counts-to-volts
   conversion that requires an explicit VREF/PGA gain rather than guessing them.
 - CSV + JSON-metadata recording.
-- Built-in Simulation Mode — runs with no hardware attached.
 - `tools/serial_inspector.py`: a standalone diagnostic to capture and study
   whatever the CWXS Bluetooth receiver actually transmits, in hex/ASCII, with
   throughput measurement and raw binary capture — **use this before assuming any
@@ -73,14 +70,9 @@ pip install -r requirements.txt
 python -m src.main
 ```
 
-The application starts directly in **Simulation Mode** — no hardware required.
-
-## Simulation Mode
-
-Default data source on first run. Generates a synthetic P–QRS–T waveform with RR
-variability, baseline wander and configurable noise at the configured sample
-rate. A **SIMULATION MODE** banner is always shown while this source is active.
-Switch to `CWXS ADS1292R` under Settings > Hardware once real hardware is ready.
+The application talks directly to the CWXS ADS1292R hardware — there is no
+simulated/no-hardware mode. A receiver must be connected before you can Connect
+and Start.
 
 ## Real Hardware Mode
 
@@ -88,12 +80,11 @@ Switch to `CWXS ADS1292R` under Settings > Hardware once real hardware is ready.
 2. Plug the CWXS USB Bluetooth receiver into the PC and wait for Windows to
    create its COM port.
 3. Launch the application.
-4. Settings > Hardware: select `CWXS ADS1292R`.
-5. Settings > Connection: select the COM port and baud rate (`115200` is only a
+4. Settings > Connection: select the COM port and baud rate (`115200` is only a
    testing default, not a confirmed CWXS specification — see
    [`docs/serial_protocol.md`](docs/serial_protocol.md)).
-6. Click **Connect**, then **Start**.
-7. Watch the ECG trace, heart rate and signal quality; use **Record** to save a
+5. Click **Connect**, then **Start**.
+6. Watch the ECG trace, heart rate and signal quality; use **Record** to save a
    CSV + metadata pair, **Stop** to end acquisition.
 
 **Before assuming the stock firmware speaks any particular protocol, use
@@ -167,9 +158,6 @@ Pressing **Record** creates, under `data/recordings/`:
   short delay; you can also reconnect manually.
 - **BPM shows `-- BPM`**: not enough plausible R-peaks detected yet — check
   signal quality and electrode contact; the app never shows a fabricated value.
-- **Respiration card shows "Respiration signal unavailable"**: no respiration
-  channel is configured in Settings > ADS1292R, or the hardware genuinely does
-  not provide one.
 
 ## Safety
 
@@ -181,13 +169,12 @@ electrical isolation and standard electromedical safety practice.
 
 ## Development priorities (recommended order)
 
-1. GUI + Simulation Mode + fluid ECG + simulated BPM.
-2. COM port detection + Serial Inspector + raw capture from the real CWXS
+1. COM port detection + Serial Inspector + raw capture from the real CWXS
    receiver.
-3. Reverse-engineer the stock CWXS protocol; add a parser for it.
-4. Visualize real ECG from the CWXS PCB.
-5. Filters, R-peaks, BPM and respiration on real data; recording.
-6. Alternative Nano firmware — only if actually needed.
+2. Reverse-engineer the stock CWXS protocol; add a parser for it.
+3. Visualize real ECG from the CWXS PCB.
+4. Filters, R-peaks, BPM and respiration on real data; recording.
+5. Alternative Nano firmware — only if actually needed.
 
 **Fundamental rule: do not replace the stock firmware before first listening to
 what the CWXS PCB already transmits.**
@@ -203,8 +190,7 @@ cwxs-ads1292r-ecg-monitor/
 │   ├── ui/                        main window, plots, status panel, settings
 │   ├── acquisition/                serial I/O, protocol parsers, circular buffer
 │   ├── signal_processing/          filters, ECG/heart-rate/respiration, units
-│   ├── recording/                  CSV + metadata recorder
-│   └── simulation/                 synthetic ECG generator
+│   └── recording/                  CSV + metadata recorder
 ├── tools/serial_inspector.py       raw serial protocol diagnostic
 ├── tests/                          pytest suite
 ├── docs/                           hardware, ADS1292R, serial protocol docs

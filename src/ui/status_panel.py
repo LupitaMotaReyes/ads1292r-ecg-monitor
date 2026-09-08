@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import QTimer, QVariantAnimation
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from src.signal_processing.ecg_processing import SignalQuality
 from src.ui import theme
-from src.ui.respiration_plot import RespirationPlotWidget
 
 _QUALITY_COLORS = {
     SignalQuality.GOOD: theme.QUALITY_GOOD,
@@ -27,40 +27,64 @@ class Card(QFrame):
 
 
 class HeartRateCard(Card):
+    _HEART_MIN_PX = 26
+    _HEART_MAX_PX = 42
+    _IDLE_BEAT_MS = 800  # pulse rate shown while acquiring but no BPM has been computed yet
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("HEART RATE", parent)
+
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        self.heart_label = QLabel("❤️")
+        self.heart_label.setStyleSheet(f"font-size: {self._HEART_MIN_PX}px;")
         self.value_label = QLabel("-- BPM")
         self.value_label.setObjectName("metricBig")
+        self.value_label.setStyleSheet(f"color: {theme.ACCENT_ECG};")
+        row.addWidget(self.heart_label)
+        row.addWidget(self.value_label, 1)
+        self._layout.addLayout(row)
+
         self.status_label = QLabel("No signal")
         self.status_label.setStyleSheet(f"color: {theme.TEXT_SECONDARY};")
-        self._layout.addWidget(self.value_label)
         self._layout.addWidget(self.status_label)
         self._layout.addStretch()
+
+        self._beat_anim = QVariantAnimation(self)
+        self._beat_anim.setKeyValueAt(0.0, self._HEART_MIN_PX)
+        self._beat_anim.setKeyValueAt(0.2, self._HEART_MAX_PX)
+        self._beat_anim.setKeyValueAt(0.4, self._HEART_MIN_PX)
+        self._beat_anim.setKeyValueAt(1.0, self._HEART_MIN_PX)
+        self._beat_anim.valueChanged.connect(self._on_beat_value_changed)
+        self._beat_timer = QTimer(self)
+        self._beat_timer.timeout.connect(self._beat_anim.start)
+        self._set_beat_interval_ms(self._IDLE_BEAT_MS)
+
+    def _on_beat_value_changed(self, value: int | None) -> None:
+        if value is None:
+            return
+        self.heart_label.setStyleSheet(f"font-size: {int(value)}px;")
+
+    def _set_beat_interval_ms(self, interval_ms: int) -> None:
+        interval_ms = max(250, interval_ms)
+        self._beat_anim.setDuration(interval_ms)
+        self._beat_timer.setInterval(interval_ms)
+
+    def set_beating(self, active: bool) -> None:
+        """Starts/stops the animated heart icon — called when acquisition starts/stops."""
+        if active:
+            self._beat_timer.start()
+            self._beat_anim.start()
+        else:
+            self._beat_timer.stop()
+            self._beat_anim.stop()
+            self.heart_label.setStyleSheet(f"font-size: {self._HEART_MIN_PX}px;")
 
     def update_bpm(self, bpm: float | None, status_text: str) -> None:
         self.value_label.setText(f"{bpm:.0f} BPM" if bpm is not None else "-- BPM")
         self.status_label.setText(status_text)
-
-
-class RespirationCard(Card):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("RESPIRATION", parent)
-        self.value_label = QLabel("--")
-        self.value_label.setObjectName("metricBig")
-        self._layout.addWidget(self.value_label)
-        self.plot = RespirationPlotWidget()
-        self.plot.setMinimumHeight(90)
-        self._layout.addWidget(self.plot)
-
-    def set_available(self, available: bool) -> None:
-        self.plot.set_available(available)
-        if not available:
-            self.value_label.setText("--")
-
-    def update_rate(self, breaths_per_min: float | None) -> None:
-        self.value_label.setText(
-            f"{breaths_per_min:.0f} BPM" if breaths_per_min is not None else "--"
-        )
+        if bpm is not None and bpm > 0:
+            self._set_beat_interval_ms(int(round(60_000 / bpm)))
 
 
 class SignalQualityCard(Card):
@@ -89,8 +113,6 @@ class StatusPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self.heart_rate_card = HeartRateCard()
-        self.respiration_card = RespirationCard()
         self.signal_quality_card = SignalQualityCard()
         layout.addWidget(self.heart_rate_card)
-        layout.addWidget(self.respiration_card)
         layout.addWidget(self.signal_quality_card)

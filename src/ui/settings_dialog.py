@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.acquisition.serial_manager import guess_cwxs_port, list_ports
-from src.config import SUPPORTED_BAUD_RATES, AppConfig, DataSource, SignalUnits
+from src.config import SUPPORTED_BAUD_RATES, AppConfig, SignalUnits
 
 
 class SettingsDialog(QDialog):
@@ -32,7 +32,6 @@ class SettingsDialog(QDialog):
 
         tabs = QTabWidget()
         tabs.addTab(self._build_connection_tab(), "Connection")
-        tabs.addTab(self._build_hardware_tab(), "Hardware")
         tabs.addTab(self._build_ads1292r_tab(), "ADS1292R")
         tabs.addTab(self._build_filters_tab(), "Filters")
         tabs.addTab(self._build_display_tab(), "Display")
@@ -109,21 +108,6 @@ class SettingsDialog(QDialog):
         device = self.port_combo.currentData() or text.split(" — ")[0]
         self._config.connection.com_port = device
 
-    # -- Hardware ---------------------------------------------------------------
-    def _build_hardware_tab(self) -> QWidget:
-        widget = QWidget()
-        form = QFormLayout(widget)
-        self.data_source_combo = QComboBox()
-        self.data_source_combo.addItem("CWXS ADS1292R", DataSource.CWXS_ADS1292R)
-        self.data_source_combo.addItem("Simulator", DataSource.SIMULATOR)
-        idx = self.data_source_combo.findData(self._config.data_source)
-        self.data_source_combo.setCurrentIndex(max(0, idx))
-        self.data_source_combo.currentIndexChanged.connect(
-            lambda: setattr(self._config, "data_source", self.data_source_combo.currentData())
-        )
-        form.addRow("Data Source", self.data_source_combo)
-        return widget
-
     # -- ADS1292R -----------------------------------------------------------------
     def _build_ads1292r_tab(self) -> QWidget:
         widget = QWidget()
@@ -155,29 +139,6 @@ class SettingsDialog(QDialog):
             lambda v: setattr(self._config.ads1292r, "ecg_channel", v)
         )
         form.addRow("ECG Channel", self.ecg_channel_spin)
-
-        self.resp_available_check = QCheckBox("Respiration channel available")
-        self.resp_available_check.setChecked(self._config.ads1292r.respiration_channel is not None)
-        self.resp_channel_spin = QSpinBox()
-        self.resp_channel_spin.setRange(1, 2)
-        self.resp_channel_spin.setValue(self._config.ads1292r.respiration_channel or 2)
-
-        def _on_resp_toggle(checked: bool) -> None:
-            self._config.ads1292r.respiration_channel = (
-                self.resp_channel_spin.value() if checked else None
-            )
-            self.resp_channel_spin.setEnabled(checked)
-
-        def _on_resp_channel_changed(v: int) -> None:
-            if self.resp_available_check.isChecked():
-                self._config.ads1292r.respiration_channel = v
-
-        self.resp_available_check.toggled.connect(_on_resp_toggle)
-        self.resp_channel_spin.valueChanged.connect(_on_resp_channel_changed)
-        self.resp_channel_spin.setEnabled(self.resp_available_check.isChecked())
-
-        form.addRow(self.resp_available_check)
-        form.addRow("Respiration Channel", self.resp_channel_spin)
 
         return widget
 

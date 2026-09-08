@@ -25,12 +25,7 @@ DEFAULT_BAUD_RATE = 115200
 SUPPORTED_BAUD_RATES = (9600, 57600, 115200, 230400, 460800)
 
 GUI_REFRESH_RATE_HZ = 45  # UI redraw rate, intentionally decoupled from acquisition rate
-ECG_DISPLAY_WINDOW_S = 8.0  # seconds of ECG shown on screen at once
-
-
-class DataSource(Enum):
-    SIMULATOR = "simulator"
-    CWXS_ADS1292R = "cwxs_ads1292r"
+ECG_DISPLAY_WINDOW_S = 4.0  # seconds of ECG shown on screen at once
 
 
 class SignalUnits(Enum):
@@ -43,18 +38,22 @@ class SignalUnits(Enum):
 class ADS1292RConfig:
     """Analog front-end parameters needed to convert ADC counts to volts.
 
-    Defaults are the ADS1292R datasheet power-on-reset values (internal 2.42 V
-    reference, PGA gain of 6), NOT a confirmed CWXS register configuration.
-    They are provided only so unit conversion has a sane starting point and must
-    be checked against the actual register writes performed by the firmware
-    (see docs/ads1292r.md). Mark as TO BE VERIFIED ON HARDWARE.
+    Defaults match the register configuration written by
+    firmware/cwxs_ads1292r_nano (CONFIG2=0xA0 -> internal 2.42V reference,
+    CH1SET/CH2SET=0x60 -> PGA gain x12), confirmed working on real hardware wired
+    directly to the ADS1292R module. If you change that firmware's register
+    values, update these to match — they are not a claim about the stock CWXS
+    firmware's configuration.
     """
 
     vref_volts: float = 2.42
-    pga_gain: int = 6
+    pga_gain: int = 12
     resolution_bits: int = 24
     ecg_channel: int = 1
-    respiration_channel: int | None = 2
+    # None by default: firmware/cwxs_ads1292r_nano leaves respiration excitation
+    # disabled, so channel 2 is not real breathing data yet (see that firmware's
+    # README) — enable this in Settings only once respiration is actually wired up.
+    respiration_channel: int | None = None
 
 
 @dataclass
@@ -89,7 +88,6 @@ class ConnectionConfig:
 
 @dataclass
 class AppConfig:
-    data_source: DataSource = DataSource.SIMULATOR
     connection: ConnectionConfig = field(default_factory=ConnectionConfig)
     ads1292r: ADS1292RConfig = field(default_factory=ADS1292RConfig)
     filters: FilterConfig = field(default_factory=FilterConfig)

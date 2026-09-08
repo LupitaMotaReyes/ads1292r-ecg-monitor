@@ -30,7 +30,7 @@ class ECGPlotWidget(QWidget):
         self.plot_widget.setLabel("left", "ECG")
         self.plot_widget.getViewBox().setMouseEnabled(x=True, y=True)  # drag-pan + wheel-zoom
 
-        self._curve = self.plot_widget.plot(pen=pg.mkPen(theme.ACCENT_ECG, width=1.5))
+        self._curve = self.plot_widget.plot(pen=pg.mkPen(theme.ACCENT_ECG, width=2.5))
         layout.addWidget(self.plot_widget)
 
         self.set_autoscale(True)

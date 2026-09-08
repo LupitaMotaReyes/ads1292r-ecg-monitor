@@ -1,8 +1,7 @@
 """Application entry point. Run with: python -m src.main
 
-Starts directly in Simulation Mode so the interface can be explored with no hardware
-connected; switch to "CWXS ADS1292R" in Settings > Hardware once real hardware is
-attached.
+Talks directly to the CWXS ADS1292R hardware over serial — connect the receiver and
+use Settings > Connection to pick the COM port before pressing Connect.
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ from src.ui.main_window import MainWindow
 
 
 def main() -> int:
-    pg.setConfigOptions(antialias=True)
+    pg.setConfigOptions(antialias=True, background=theme.BG_PANEL, foreground=theme.TEXT_PRIMARY)
     app = QApplication(sys.argv)
     app.setStyleSheet(theme.STYLESHEET)
     window = MainWindow()

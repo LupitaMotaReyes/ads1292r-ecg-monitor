@@ -37,7 +37,7 @@ def build_metadata(config: AppConfig) -> dict:
         "hardware": "CWXS ADS1292R-Arduino Wireless Transmission Kit",
         "pcb": "CWXS Arduino Nano wireless carrier PCB",
         "adc": "Texas Instruments ADS1292R",
-        "data_source": config.data_source.value,
+        "data_source": "cwxs_ads1292r",
         "sample_rate_hz": config.connection.sample_rate_hz,
         "baud_rate": config.connection.baud_rate,
         "com_port": config.connection.com_port,

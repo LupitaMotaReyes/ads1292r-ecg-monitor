@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 from src.acquisition.circular_buffer import CircularBuffer
 from src.acquisition.protocol import CSVProtocolParser, Sample, SampleRateEstimator
 from src.acquisition.serial_manager import SerialManager
-from src.config import GUI_REFRESH_RATE_HZ, AppConfig, DataSource, SignalUnits
+from src.config import GUI_REFRESH_RATE_HZ, AppConfig, SignalUnits
 from src.recording.recorder import Recorder, build_metadata
 from src.signal_processing.ecg_processing import ECGProcessor, SignalQuality
 from src.signal_processing.heart_rate import HeartRateEstimator
@@ -29,13 +29,10 @@ from src.signal_processing.units import (
     volts_to_microvolts,
     volts_to_millivolts,
 )
-from src.simulation.ecg_simulator import ECGSimulator
 from src.ui import theme
 from src.ui.ecg_plot import ECGPlotWidget
 from src.ui.settings_dialog import SettingsDialog
 from src.ui.status_panel import StatusPanel
-
-SIMULATOR_TICK_MS = 20  # 50 Hz acquisition-side tick for the simulator
 
 _QUALITY_STATUS_TEXT = {
     SignalQuality.GOOD: "Signal stable",
@@ -66,10 +63,6 @@ class MainWindow(QMainWindow):
         self._serial_manager.error.connect(self._on_serial_error)
         self._csv_parser = CSVProtocolParser()
         self._sample_rate_estimator = SampleRateEstimator()
-
-        self._simulator: ECGSimulator | None = None
-        self._simulator_timer = QTimer(self)
-        self._simulator_timer.timeout.connect(self._on_simulator_tick)
 
         self._recorder = Recorder()
         self._is_connected = False
@@ -147,20 +140,13 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(20, 12, 20, 12)
 
         title_box = QVBoxLayout()
-        title = QLabel("ECG MONITOR")
+        title = QLabel("🫀 ECG MONITOR")
         title.setObjectName("appTitle")
-        subtitle = QLabel("CWXS ADS1292R | Real-Time Biosignal Acquisition")
+        subtitle = QLabel("CWXS ADS1292R  ·  Real-Time Heart Monitor")
         subtitle.setObjectName("appSubtitle")
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
         layout.addLayout(title_box)
-
-        self.simulation_banner = QLabel("SIMULATION MODE")
-        self.simulation_banner.setStyleSheet(
-            f"color: {theme.BG_DARK}; background-color: {theme.QUALITY_FAIR};"
-            "border-radius: 6px; padding: 4px 10px; font-weight: 700;"
-        )
-        layout.addWidget(self.simulation_banner)
 
         layout.addStretch()
 
@@ -187,21 +173,25 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(20, 12, 20, 12)
 
-        self.connect_btn = QPushButton("Connect")
-        self.connect_btn.setObjectName("primary")
+        self.connect_btn = QPushButton("🔌  Connect")
+        self.connect_btn.setObjectName("success")
         self.connect_btn.clicked.connect(self._on_connect_clicked)
-        self.disconnect_btn = QPushButton("Disconnect")
+        self.disconnect_btn = QPushButton("🔌  Disconnect")
         self.disconnect_btn.clicked.connect(self._on_disconnect_clicked)
-        self.start_btn = QPushButton("Start")
+        self.start_btn = QPushButton("▶  Start")
+        self.start_btn.setObjectName("primary")
         self.start_btn.clicked.connect(self._on_start_clicked)
         self.pause_btn = QPushButton("Pause")
+        self.pause_btn.setObjectName("warning")
         self.pause_btn.clicked.connect(self._on_pause_clicked)
         self.record_btn = QPushButton("Record")
+        self.record_btn.setObjectName("record")
         self.record_btn.clicked.connect(self._on_record_clicked)
         self.stop_btn = QPushButton("Stop")
         self.stop_btn.setObjectName("danger")
         self.stop_btn.clicked.connect(self._on_stop_clicked)
-        self.settings_btn = QPushButton("Settings")
+        self.settings_btn = QPushButton("⚙️  Settings")
+        self.settings_btn.setObjectName("info")
         self.settings_btn.clicked.connect(self._on_settings_clicked)
 
         for btn in (
@@ -225,27 +215,16 @@ class MainWindow(QMainWindow):
 
     # -- Connect / Disconnect -----------------------------------------------------
     def _on_connect_clicked(self) -> None:
-        if self._config.data_source == DataSource.SIMULATOR:
-            self._simulator = ECGSimulator(fs=self._config.connection.sample_rate_hz)
-            self._is_connected = True
-            self.com_port_label.setText("SIMULATOR")
-            self._set_connection_indicator(True)
-        else:
-            port = self._config.connection.com_port
-            if not port:
-                self._on_serial_error("No COM port selected. Open Settings first.")
-                return
-            self._serial_manager.connect_to_port(port, self._config.connection.baud_rate)
+        port = self._config.connection.com_port
+        if not port:
+            self._on_serial_error("No COM port selected. Open Settings first.")
+            return
+        self._serial_manager.connect_to_port(port, self._config.connection.baud_rate)
         self._update_button_states()
 
     def _on_disconnect_clicked(self) -> None:
         self._on_stop_clicked()
-        if self._config.data_source == DataSource.SIMULATOR:
-            self._simulator = None
-            self._is_connected = False
-            self._set_connection_indicator(False)
-        else:
-            self._serial_manager.disconnect_port()
+        self._serial_manager.disconnect_port()
         self._update_button_states()
 
     def _on_serial_connected(self, port: str, baud: int) -> None:
@@ -279,8 +258,7 @@ class MainWindow(QMainWindow):
             return
         self._is_acquiring = True
         self._acquisition_start_monotonic = time.monotonic()
-        if self._config.data_source == DataSource.SIMULATOR:
-            self._simulator_timer.start(SIMULATOR_TICK_MS)
+        self.status_panel.heart_rate_card.set_beating(True)
         self._update_button_states()
 
     def _on_pause_clicked(self) -> None:
@@ -290,7 +268,7 @@ class MainWindow(QMainWindow):
 
     def _on_stop_clicked(self) -> None:
         self._is_acquiring = False
-        self._simulator_timer.stop()
+        self.status_panel.heart_rate_card.set_beating(False)
         if self._recorder.is_recording:
             self._stop_recording()
         self.elapsed_label.setText("00:00:00")
@@ -300,7 +278,7 @@ class MainWindow(QMainWindow):
         if not self._recorder.is_recording:
             metadata = build_metadata(self._config)
             self._recorder.start(metadata)
-            self.recording_label.setText("Recording ●")
+            self.recording_label.setText("🔴 Recording")
             self.record_btn.setText("Stop Recording")
         else:
             self._stop_recording()
@@ -325,23 +303,6 @@ class MainWindow(QMainWindow):
             self._config = dialog.result_config()
             self._build_processing_pipeline()
             self.sample_rate_label.setText(f"{self._config.connection.sample_rate_hz} SPS")
-            self.status_panel.respiration_card.set_available(
-                self._config.ads1292r.respiration_channel is not None
-            )
-
-    # -- Simulator acquisition tick -------------------------------------------------
-    def _on_simulator_tick(self) -> None:
-        if self._simulator is None or not self._is_acquiring:
-            return
-        fs = self._config.connection.sample_rate_hz
-        n = max(1, int(round(fs * SIMULATOR_TICK_MS / 1000.0)))
-        ecg_counts, resp_counts = self._simulator.generate_chunk(n)
-        now_ms = int(time.time() * 1000)
-        samples = [
-            Sample(timestamp_ms=now_ms, ecg_raw=int(e), resp_raw=int(r), status=0)
-            for e, r in zip(ecg_counts, resp_counts, strict=True)
-        ]
-        self._handle_samples(samples)
 
     # -- Real serial data -----------------------------------------------------------
     def _on_serial_bytes(self, data: bytes) -> None:
@@ -405,21 +366,10 @@ class MainWindow(QMainWindow):
             self.ecg_plot.set_y_range(self._config.display.y_min, self._config.display.y_max)
         self.ecg_plot.set_units_label(self._units_label())
 
-        self.status_panel.respiration_card.set_available(
-            self._config.ads1292r.respiration_channel is not None
-        )
-        if self._config.ads1292r.respiration_channel is not None:
-            resp_y = self._resp_buffer.get_latest(n)
-            if len(resp_y) > 1:
-                resp_x = (np.arange(len(resp_y)) - len(resp_y)) / fs
-                self.status_panel.respiration_card.plot.update_data(resp_x, resp_y)
-            self.status_panel.respiration_card.update_rate(self._latest_resp_rate)
-
         status_text = _QUALITY_STATUS_TEXT[self._latest_quality]
         self.status_panel.heart_rate_card.update_bpm(self._latest_bpm, status_text)
         self.status_panel.signal_quality_card.update_quality(self._latest_quality)
 
-        self.simulation_banner.setVisible(self._config.data_source == DataSource.SIMULATOR)
         self.sample_rate_label.setText(f"{self._config.connection.sample_rate_hz} SPS")
 
     def _convert_units(self, counts: np.ndarray) -> np.ndarray:
