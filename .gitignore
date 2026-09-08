@@ -1,0 +1,28 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Captured serial data and recordings (folder kept via .gitkeep)
+data/recordings/*.csv
+data/recordings/*.json
+tools/*.bin
+*.bin
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Arduino build artifacts
+firmware/**/build/
+firmware/**/*.hex

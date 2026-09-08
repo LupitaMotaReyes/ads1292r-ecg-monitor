@@ -1,0 +1,33 @@
+[project]
+name = "cwxs-ads1292r-ecg-monitor"
+version = "0.1.0"
+description = "Real-time ECG acquisition and visualization for the CWXS ADS1292R-Arduino wireless transmission kit"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "PySide6>=6.6",
+    "pyqtgraph>=0.13",
+    "pyserial>=3.5",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pandas>=2.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "ruff>=0.4"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
