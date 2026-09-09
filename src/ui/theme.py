@@ -30,7 +30,7 @@ QUALITY_FAIR = "#ffc93c"
 QUALITY_POOR = "#ff6b6b"
 QUALITY_UNKNOWN = "#93a7c2"
 
-FONT_FAMILY = "Segoe UI, -apple-system, Verdana, Helvetica Neue, Arial, sans-serif"
+FONT_FAMILY = "Comic Sans MS, Comic Sans, Segoe UI, Verdana, Helvetica Neue, Arial, sans-serif"
 
 STYLESHEET = f"""
 QWidget {{

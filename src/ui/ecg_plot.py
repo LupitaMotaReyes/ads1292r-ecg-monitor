@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 import pyqtgraph as pg
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from src.ui import theme
@@ -29,6 +30,12 @@ class ECGPlotWidget(QWidget):
         self.plot_widget.setLabel("bottom", "Time", units="s")
         self.plot_widget.setLabel("left", "ECG")
         self.plot_widget.getViewBox().setMouseEnabled(x=True, y=True)  # drag-pan + wheel-zoom
+
+        axis_font = QFont(theme.FONT_FAMILY.split(",")[0].strip())
+        for axis_name in ("bottom", "left"):
+            axis = self.plot_widget.getAxis(axis_name)
+            axis.setTickFont(axis_font)
+            axis.label.setFont(axis_font)
 
         self._curve = self.plot_widget.plot(pen=pg.mkPen(theme.ACCENT_ECG, width=2.5))
         layout.addWidget(self.plot_widget)
